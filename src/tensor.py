@@ -336,6 +336,42 @@ class Tensor:
         out._prev = set(t for t in tensors if t.requires_grad)
         return out
 
+    def transpose(self, *dims: int) -> 'Tensor':
+        """
+        General-purpose transpose for arbitrary dimensions (like np.transpose or torch.permute).
+        """
+        out = Tensor(self.data.transpose(*dims), requires_grad=self.requires_grad,
+                     _children=(self,), _op='transpose')
+
+        def _backward():
+            if self.requires_grad:
+                inverse = np.argsort(dims)
+                self.grad += out.grad.transpose(*inverse)
+
+        out._backward = _backward
+        return out
+
+    def permute(self, *dims: int) -> 'Tensor':
+        # reorders all dims
+        data = np.transpose(self.data, dims)
+        out = Tensor(data, requires_grad=self.requires_grad)
+
+        def _backward():
+            if self.requires_grad:
+                inverse = np.argsort(dims)
+                self.grad += np.transpose(out.grad, inverse)
+
+        out._backward = _backward
+        out._prev = {self}
+        out._op = 'permute'
+        return out
+
+    @property
+    def T(self) -> 'Tensor':
+        if len(self.data.shape) != 2:
+            raise ValueError(f".T only supports 2D tensors, got shape {self.data.shape}")
+        return self.transpose(1, 0)
+
     def shape(self):
         return self.data.shape
 

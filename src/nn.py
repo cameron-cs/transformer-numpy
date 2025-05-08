@@ -89,3 +89,48 @@ class Sequential(Module):
         for layer in self.layers:
             params.extend(layer.parameters())
         return params
+
+
+class Softmax(Module):
+    """
+     Applies the softmax function to the input tensor along the specified axis.
+
+     Softmax converts raw logits into probabilities by exponentiating and normalising them.
+     The output probabilities sum to 1 along the given axis.
+
+     Parameters:
+         axis (int): Axis over which to compute softmax. Default is -1 (last dimension).
+
+     Forward:
+         Input: Tensor of shape (batch_size, num_classes) or similar.
+         Output: Same shape, with probabilities in range (0, 1), summing to 1 across `axis`.
+
+     Backward:
+         Computes the Jacobian-vector product for each sample in the batch using the softmax Jacobian:
+             J = diag(p) - p @ p.T
+     """
+
+    def __init__(self, axis=-1):
+        super().__init__()
+        self.axis = axis
+
+    def forward(self, x: Tensor) -> Tensor:
+        # shift logits for numerical stability
+        shifted = x.data - np.max(x.data, axis=self.axis, keepdims=True)
+        exp_x = np.exp(shifted)
+        probs = exp_x / np.sum(exp_x, axis=self.axis, keepdims=True)
+        out = Tensor(probs, requires_grad=x.requires_grad)
+
+        def _backward():
+            if x.requires_grad:
+                # jacobian-based gradient
+                dx = np.empty_like(x.data)
+                for i in range(x.data.shape[0]):
+                    p = probs[i].reshape(-1, 1)
+                    J = np.diagflat(p) - np.dot(p, p.T)
+                    dx[i] = J @ out.grad[i]
+                x.grad += dx
+
+        out._backward = _backward
+        out._prev = {x}
+        return out
