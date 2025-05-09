@@ -51,9 +51,12 @@ class Tensor:
             return
 
         if grad is None:
-            if self.data.size != 1:
+            if self.grad is not None:
+                grad = self.grad
+            elif self.data.size != 1:
                 raise RuntimeError("grad must be specified for non-scalar outputs")
-            grad = np.ones_like(self.data)
+            else:
+                grad = np.ones_like(self.data)
 
         self.grad = grad
         topo = []
@@ -165,6 +168,20 @@ class Tensor:
     def __neg__(self):
         return self * Tensor(-1.0)
 
+    def __hash__(self):
+        return id(self)
+
+    def __eq_graph__(self, other):
+        return id(self) == id(other)
+
+    def __eq__(self, other):
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(self.data == other.data)
+
+    def equal(self, other) -> 'Tensor':
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        return Tensor(self.data == other.data)
+
     def __mul__(self, other: Union['Tensor', float, int]) -> 'Tensor':
         """
         Multiply this tensor by another tensor or scalar.
@@ -184,6 +201,20 @@ class Tensor:
                 self.grad += unbroadcast(other.data * out.grad, self.data.shape)
             if other.requires_grad:
                 other.grad += unbroadcast(self.data * out.grad, other.data.shape)
+
+        out._backward = _backward
+        return out
+
+    def __truediv__(self, other: Union['Tensor', float, int]) -> 'Tensor':
+        other = other if isinstance(other, Tensor) else Tensor(other)
+        out = Tensor(self.data / other.data, requires_grad=self.requires_grad or other.requires_grad,
+                     _children=(self, other), _op='/')
+
+        def _backward():
+            if self.requires_grad:
+                self.grad += unbroadcast((1 / other.data) * out.grad, self.data.shape)
+            if other.requires_grad:
+                other.grad += unbroadcast((-self.data / (other.data ** 2)) * out.grad, other.data.shape)
 
         out._backward = _backward
         return out
@@ -226,17 +257,11 @@ class Tensor:
 
         def _backward():
             if self.requires_grad:
-                grad_self = out.grad @ other.data.T
-                if self.grad is None:
-                    self.grad = grad_self
-                else:
-                    self.grad += grad_self
+                grad_self = np.matmul(out.grad, np.swapaxes(other.data, -1, -2))
+                self.grad = self.grad + grad_self if self.grad is not None else grad_self
             if other.requires_grad:
-                grad_other = self.data.T @ out.grad
-                if other.grad is None:
-                    other.grad = grad_other
-                else:
-                    other.grad += grad_other
+                grad_other = np.matmul(np.swapaxes(self.data, -1, -2), out.grad)
+                other.grad = other.grad + grad_other if other.grad is not None else grad_other
 
         out._backward = _backward
         return out
@@ -336,44 +361,50 @@ class Tensor:
         out._prev = set(t for t in tensors if t.requires_grad)
         return out
 
-    def transpose(self, *dims: int) -> 'Tensor':
-        """
-        General-purpose transpose for arbitrary dimensions (like np.transpose or torch.permute).
-        """
-        out = Tensor(self.data.transpose(*dims), requires_grad=self.requires_grad,
+    def transpose(self, dim0: int, dim1: int) -> 'Tensor':
+        axes = list(range(self.data.ndim))
+        axes[dim0], axes[dim1] = axes[dim1], axes[dim0]
+        out_data = self.data.transpose(axes)
+
+        out = Tensor(out_data, requires_grad=self.requires_grad,
                      _children=(self,), _op='transpose')
 
         def _backward():
             if self.requires_grad:
-                inverse = np.argsort(dims)
-                self.grad += out.grad.transpose(*inverse)
+                inverse = np.argsort(axes)
+                self.grad += out.grad.transpose(inverse)
 
         out._backward = _backward
-        return out
-
-    def permute(self, *dims: int) -> 'Tensor':
-        # reorders all dims
-        data = np.transpose(self.data, dims)
-        out = Tensor(data, requires_grad=self.requires_grad)
-
-        def _backward():
-            if self.requires_grad:
-                inverse = np.argsort(dims)
-                self.grad += np.transpose(out.grad, inverse)
-
-        out._backward = _backward
-        out._prev = {self}
-        out._op = 'permute'
         return out
 
     @property
     def T(self) -> 'Tensor':
-        if len(self.data.shape) != 2:
+        if len(self.shape()) != 2:
             raise ValueError(f".T only supports 2D tensors, got shape {self.data.shape}")
         return self.transpose(1, 0)
 
     def shape(self):
         return self.data.shape
+
+    def size(self, dim: Optional[int] = None):
+        if dim is None:
+            return self.data.shape
+        else:
+            return self.data.shape[dim]
+
+    def masked_fill(self, mask: 'Tensor', value: Union[float, int]) -> 'Tensor':
+        assert self.data.shape == mask.data.shape, "Shapes must match for masked_fill"
+        out_data = np.where(mask.data, self.data, value)
+        out = Tensor(out_data, requires_grad=self.requires_grad or mask.requires_grad,
+                     _children=(self,), _op='masked_fill')
+
+        def _backward():
+            if self.requires_grad:
+                grad = np.where(mask.data, out.grad, 0)
+                self.grad += grad
+
+        out._backward = _backward
+        return out
 
     @staticmethod
     def zeros(shape) -> 'Tensor':

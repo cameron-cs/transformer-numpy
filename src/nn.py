@@ -1,5 +1,6 @@
 import numpy as np
 
+from src.nn_utils import xavier_init
 from src.tensor import Tensor
 
 
@@ -122,14 +123,23 @@ class Softmax(Module):
         out = Tensor(probs, requires_grad=x.requires_grad)
 
         def _backward():
-            if x.requires_grad:
-                # jacobian-based gradient
-                dx = np.empty_like(x.data)
-                for i in range(x.data.shape[0]):
-                    p = probs[i].reshape(-1, 1)
-                    J = np.diagflat(p) - np.dot(p, p.T)
-                    dx[i] = J @ out.grad[i]
-                x.grad += dx
+            if not x.requires_grad:
+                return
+
+            grad = out.grad
+            dx = np.zeros_like(x.data)
+
+            # Reshape to (batch*, softmax_dim)
+            orig_shape = probs.shape
+            flat_probs = probs.reshape(-1, probs.shape[self.axis])
+            flat_grad = grad.reshape(-1, grad.shape[self.axis])
+
+            for i in range(flat_probs.shape[0]):
+                p = flat_probs[i].reshape(-1, 1)
+                J = np.diagflat(p) - p @ p.T
+                dx.reshape(-1, dx.shape[self.axis])[i] = J @ flat_grad[i]
+
+            x.grad = x.grad + dx if x.grad is not None else dx
 
         out._backward = _backward
         out._prev = {x}
