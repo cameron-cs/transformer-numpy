@@ -6,20 +6,6 @@ from src.tensor import Tensor
 from src.transformer.blocks.attention.multi_head_attention import MultiHeadAttentionBlock
 from src.transformer.blocks.attention.scaled_dot_product import ScaledDotProductAttentionBlock
 
-vocab = {
-    "the": [1.0, 0.0],
-    "cat": [0.0, 1.0],
-    "sat": [0.5, 0.5],
-    "on": [0.2, 0.8],
-    "mat": [0.0, 1.0],
-}
-
-
-def encode(text, vocab):
-    tokens = text.split()
-    vectors = [vocab[t] for t in tokens]
-    return Tensor(np.array(vectors).reshape(1, 1, len(tokens), -1))  # (1, 1, L, d)
-
 
 def test_scaled_dot_product_attention():
     q = Tensor([[[[1.0, 0.0], [0.0, 1.0]]]], requires_grad=True)  # shape (1, 1, 2, 2)
