@@ -92,6 +92,44 @@ class Sequential(Module):
         return params
 
 
+class Dropout(Module):
+    """
+    Dropout layer for regularisation.
+
+    Parameters:
+        p (float): Probability of dropping a unit (0 <= p < 1).
+
+    Behavior:
+        - During training: zeroes out inputs with probability p, scales by 1/(1-p).
+        - During evaluation: returns input unchanged.
+    """
+    def __init__(self, p: float = 0.5):
+        super(Dropout, self).__init__()
+        assert 0 <= p < 1, "Dropout probability must be in [0, 1)"
+        self.p = p
+        self.training = True  # default mode is training
+
+    def forward(self, x: Tensor) -> Tensor:
+        if not self.training or self.p == 0.0:
+            return x
+
+        # create dropout mask: keep probability = (1 - p)
+        mask = (np.random.rand(*x.data.shape) > self.p).astype(x.data.dtype)
+        scale = 1.0 / (1.0 - self.p)
+        out_data = x.data * mask * scale
+        out = Tensor(out_data, requires_grad=x.requires_grad)
+
+        def _backward():
+            if x.requires_grad:
+                grad = out.grad * mask * scale
+                x.grad = x.grad + grad if x.grad is not None else grad
+
+        out._backward = _backward
+        out._prev = {x}
+        out._op = 'dropout'
+        return out
+
+
 class Softmax(Module):
     """
      Applies the softmax function to the input tensor along the specified axis.
@@ -129,8 +167,7 @@ class Softmax(Module):
             grad = out.grad
             dx = np.zeros_like(x.data)
 
-            # Reshape to (batch*, softmax_dim)
-            orig_shape = probs.shape
+            # reshape to (batch*, softmax_dim)
             flat_probs = probs.reshape(-1, probs.shape[self.axis])
             flat_grad = grad.reshape(-1, grad.shape[self.axis])
 

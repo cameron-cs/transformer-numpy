@@ -51,14 +51,12 @@ class Tensor:
             return
 
         if grad is None:
-            if self.grad is not None:
-                grad = self.grad
-            elif self.data.size != 1:
+            if self.data.size != 1:
                 raise RuntimeError("grad must be specified for non-scalar outputs")
-            else:
-                grad = np.ones_like(self.data)
+            grad = np.ones_like(self.data)
 
-        self.grad = grad
+        self.grad = self.grad + grad if self.grad is not None else grad
+
         topo = []
         visited = set()
 
@@ -70,6 +68,7 @@ class Tensor:
                 topo.append(t)
 
         build_topo(self)
+
         for t in reversed(topo):
             t._backward()
 
@@ -171,9 +170,6 @@ class Tensor:
     def __hash__(self):
         return id(self)
 
-    def __eq_graph__(self, other):
-        return id(self) == id(other)
-
     def __eq__(self, other):
         other = other if isinstance(other, Tensor) else Tensor(other)
         return Tensor(self.data == other.data)
@@ -198,9 +194,17 @@ class Tensor:
 
         def _backward():
             if self.requires_grad:
-                self.grad += unbroadcast(other.data * out.grad, self.data.shape)
+                grad_self = unbroadcast(other.data * out.grad, self.data.shape)
+                if self.grad is None:
+                    self.grad = grad_self
+                else:
+                    self.grad += grad_self
             if other.requires_grad:
-                other.grad += unbroadcast(self.data * out.grad, other.data.shape)
+                grad_other = unbroadcast(self.data * out.grad, other.data.shape)
+                if other.grad is None:
+                    other.grad = grad_other
+                else:
+                    other.grad += grad_other
 
         out._backward = _backward
         return out
@@ -212,9 +216,17 @@ class Tensor:
 
         def _backward():
             if self.requires_grad:
-                self.grad += unbroadcast((1 / other.data) * out.grad, self.data.shape)
+                grad_self = unbroadcast((1 / other.data) * out.grad, self.data.shape)
+                if self.grad is None:
+                    self.grad = grad_self
+                else:
+                    self.grad += grad_self
             if other.requires_grad:
-                other.grad += unbroadcast((-self.data / (other.data ** 2)) * out.grad, other.data.shape)
+                grad_other = unbroadcast((-self.data / (other.data ** 2)) * out.grad, other.data.shape)
+                if other.grad is None:
+                    other.grad = grad_other
+                else:
+                    other.grad += grad_other
 
         out._backward = _backward
         return out
@@ -233,7 +245,9 @@ class Tensor:
 
         def _backward():
             if self.requires_grad:
-                self.grad += unbroadcast((power * self.data ** (power - 1)) * out.grad, self.data.shape)
+                grad_self = unbroadcast((power * self.data ** (power - 1)) * out.grad, self.data.shape)
+                if self.grad is None:
+                    self.grad = grad_self
 
         out._backward = _backward
         return out
@@ -252,7 +266,7 @@ class Tensor:
             Tensor: A new tensor representing the result of the matrix multiplication.
         """
         assert isinstance(other, Tensor)
-        out = Tensor(self.data @ other.data, requires_grad=self.requires_grad or other.requires_grad,
+        out = Tensor(np.matmul(self.data, other.data), requires_grad=self.requires_grad or other.requires_grad,
                      _children=(self, other), _op='@')
 
         def _backward():
@@ -321,18 +335,42 @@ class Tensor:
 
         def _backward():
             if self.requires_grad:
-                self.grad += np.ones_like(self.data) * out.grad
+                grad_self = np.ones_like(self.data) * out.grad
+                if self.grad is None:
+                    self.grad = grad_self
+                else:
+                    self.grad += grad_self
 
         out._backward = _backward
         return out
 
-    def mean(self):
-        out = Tensor(self.data.mean(), requires_grad=self.requires_grad, _children=(self,), _op='mean')
+    def mean(self, axis=None, keepdim=False):
+        data = self.data.mean(axis=axis, keepdims=keepdim)
+        out = Tensor(data, requires_grad=self.requires_grad, _children=(self,), _op='mean')
 
         def _backward():
-            if self.requires_grad:
-                grad = (out.grad / self.data.size) * np.ones_like(self.data)
-                self.grad += grad
+            if not self.requires_grad:
+                return
+
+            # get the shape of the gradient to broadcast properly
+            grad = out.grad
+            if axis is None:
+                div = self.data.size
+            else:
+                axes = axis if isinstance(axis, tuple) else (axis,)
+                axes = tuple([a if a >= 0 else a + self.data.ndim for a in axes])
+                div = np.prod([self.data.shape[a] for a in axes])
+
+                # broadcast grad back to input shape
+                if not keepdim:
+                    grad = np.expand_dims(grad, axis=axes)
+
+            grad_self = grad * (1.0 / div) * np.ones_like(self.data)
+
+            if self.grad is None:
+                self.grad = grad_self
+            else:
+                self.grad += grad_self
 
         out._backward = _backward
         return out
@@ -359,6 +397,25 @@ class Tensor:
 
         out._backward = _backward
         out._prev = set(t for t in tensors if t.requires_grad)
+        return out
+
+    def sqrt(self):
+        data = np.sqrt(self.data)
+        out = Tensor(data, requires_grad=self.requires_grad, _children=(self,), _op='sqrt')
+
+        def _backward():
+            if not self.requires_grad:
+                return
+
+            # derivative: 1 / (2 * sqrt(x))
+            grad_self = (0.5 / np.sqrt(self.data)) * out.grad
+
+            if self.grad is None:
+                self.grad = grad_self
+            else:
+                self.grad += grad_self
+
+        out._backward = _backward
         return out
 
     def transpose(self, dim0: int, dim1: int) -> 'Tensor':
@@ -392,6 +449,40 @@ class Tensor:
         else:
             return self.data.shape[dim]
 
+    def view(self, *shape: int) -> 'Tensor':
+        shape = tuple(shape)
+        reshaped = self.data.reshape(shape)
+        out = Tensor(reshaped, requires_grad=self.requires_grad, _children=(self,), _op='view')
+
+        def _backward():
+            if self.requires_grad:
+                grad = out.grad.reshape(self.data.shape)
+                self.grad = self.grad + grad if self.grad is not None else grad
+
+        out._backward = _backward
+        return out
+
+    def contiguous(self) -> 'Tensor':
+        """
+        Returns a contiguous copy of the tensor if it is not already contiguous.
+
+        Returns:
+            Tensor: A contiguous version of the tensor.
+        """
+        if self.data.flags['C_CONTIGUOUS']:
+            return self  # llready contiguous
+        out = Tensor(np.ascontiguousarray(self.data), requires_grad=self.requires_grad)
+
+        def _backward():
+            if self.requires_grad:
+                # just propagate the gradient back as is
+                self.grad += out.grad
+
+        out._backward = _backward
+        out._prev = {self}
+        out._op = 'contiguous'
+        return out
+
     def masked_fill(self, mask: 'Tensor', value: Union[float, int]) -> 'Tensor':
         assert self.data.shape == mask.data.shape, "Shapes must match for masked_fill"
         out_data = np.where(mask.data, self.data, value)
@@ -405,6 +496,18 @@ class Tensor:
 
         out._backward = _backward
         return out
+
+    def var(self, axis=None, keepdim=False, unbiased=True):
+        mean = self.mean(axis=axis, keepdim=True)
+        diff = self - mean
+        squared = diff * diff
+        if unbiased:
+            axes = axis if isinstance(axis, tuple) else (axis,) if axis is not None else tuple(range(self.data.ndim))
+            axes = tuple([a if a >= 0 else a + self.data.ndim for a in axes])
+            div = np.prod([self.data.shape[a] for a in axes])
+            return squared.sum(axis=axis, keepdim=keepdim) * (1.0 / (div - 1))
+        else:
+            return squared.mean(axis=axis, keepdim=keepdim)
 
     @staticmethod
     def zeros(shape) -> 'Tensor':

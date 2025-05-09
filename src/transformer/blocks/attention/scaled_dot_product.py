@@ -4,7 +4,7 @@ from src.nn import Module, Softmax
 from src.tensor import Tensor
 
 
-class ScaleDotProductAttentionBlock(Module):
+class ScaledDotProductAttentionBlock(Module):
     """
     Implements the **Scaled Dot-Product Attention** mechanism used as the core of the Transformer architecture.
 
@@ -26,7 +26,7 @@ class ScaleDotProductAttentionBlock(Module):
     This implementation supports optional masking, and is compatible with your custom autograd-enabled `Tensor` class.
     """
     def __init__(self):
-        super(ScaleDotProductAttentionBlock, self).__init__()
+        super(ScaledDotProductAttentionBlock, self).__init__()
         self.softmax = Softmax()
 
     def forward(self, q: 'Tensor', k: 'Tensor', v: 'Tensor', mask=None, e=1e-12):
