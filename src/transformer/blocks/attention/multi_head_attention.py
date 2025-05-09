@@ -16,14 +16,14 @@ class MultiHeadAttentionBlock(Module):
 
     def forward(self, q: 'Tensor', k: 'Tensor', v: 'Tensor', mask=None) -> 'Tensor':
         # 1. dot product with weight matrices
-        q = self.linear_wq(q)
-        k = self.linear_wk(k)
-        v - self.linear_wv(v)
+        q: Tensor = self.linear_wq(q)
+        k: Tensor = self.linear_wk(k)
+        v: Tensor = self.linear_wv(v)
 
         # 2. split tensor by number of heads
-        q = self.split(q)
-        k = self.split(k)
-        v = self.split(v)
+        q: Tensor = self.split(q)
+        k: Tensor = self.split(k)
+        v: Tensor = self.split(v)
 
         # 3. do scale dot product to compute similarity
         out, _ = self.attention(q, k, v, mask)
@@ -41,6 +41,7 @@ class MultiHeadAttentionBlock(Module):
         :param tensor: [batch_size, length, d_model]
         :return: [batch_size, head, length, d_tensor]
         """
+        print("tensor.size()", tensor.size())
         batch_size, length, d_model = tensor.size()
         d_tensor = d_model // self.h
         tensor = tensor.view(batch_size, length, self.h, d_tensor).transpose(1, 2)
