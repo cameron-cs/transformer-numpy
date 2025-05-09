@@ -125,6 +125,82 @@ def test_attention_cat_attends_to_mat():
     assert np.isclose(cat_weights.sum(), 1.0), "Attention weights should sum to 1"
 
 
+def test_mha_cat_equals_mat_attention():
+    vocab = {
+        "the": Tensor([[[[1.0, 0.0, 0.0, 0.0]]]]),
+        "cat": Tensor([[[[0.0, 1.0, 0.0, 0.0]]]]),
+        "sat": Tensor([[[[0.0, 0.5, 0.5, 0.0]]]]),
+        "on": Tensor([[[[0.0, 0.2, 0.8, 0.0]]]]),
+        "mat": Tensor([[[[0.0, 1.0, 0.0, 0.0]]]]),
+    }
+
+    sentence = ["the", "cat", "sat", "on", "mat"]
+    x_np = np.stack([vocab[t].data[0, 0, 0] for t in sentence])  # (5, 4)
+    x = Tensor(x_np[None, :, :])  # (1, 5, 4)
+
+    mha = MultiHeadAttentionBlock(h=2, d_model=4)
+
+    # run attention
+    out = mha(x, x, x)
+
+    # manually inspect weights
+    q = mha.split(mha.linear_wq(x))
+    k = mha.split(mha.linear_wk(x))
+    v = mha.split(mha.linear_wv(x))
+    _, attn = mha.attention(q, k, v)
+
+    attn_weights = attn.data[0, 0, 1]
+
+    assert abs(attn_weights[1] - attn_weights[4]) < 1e-4, "'cat' and 'mat' should receive equal attention"
+    assert np.isclose(attn_weights.sum(), 1.0), "Attention distribution must sum to 1"
+
+    # identical outputs for "cat" and "mat"
+    assert np.allclose(out.data[0, 1], out.data[0, 4], atol=1e-4), "Output vectors should match for 'cat' and 'mat'"
+
+
+def test_mha_attention_semantics_and_gradients():
+    vocab = {
+        "dogs": Tensor([[[[1.0, 0.0, 0.0, 0.0]]]]),
+        "bark": Tensor([[[[0.0, 1.0, 0.0, 0.0]]]]),
+        "cats": Tensor([[[[1.0, 0.0, 0.0, 0.0]]]]),
+        "meow": Tensor([[[[0.0, 1.0, 0.0, 0.0]]]]),
+        "loud": Tensor([[[[0.0, 0.5, 0.5, 0.0]]]]),
+        "quiet": Tensor([[[[0.0, 0.5, 0.5, 0.0]]]]),
+    }
+
+    sentence = ["dogs", "bark", "loud", "cats", "meow", "quiet"]
+    x_np = np.stack([vocab[t].data[0, 0, 0] for t in sentence])  # (6, 4)
+    x = Tensor(x_np[None, :, :], requires_grad=True)  # (1, 6, 4)
+
+    mha = MultiHeadAttentionBlock(h=2, d_model=4)
+
+    out = mha(x, x, x)
+
+    # ==== attention similarity ====
+    q = mha.split(mha.linear_wq(x))
+    k = mha.split(mha.linear_wk(x))
+    v = mha.split(mha.linear_wv(x))
+    _, attn = mha.attention(q, k, v)
+
+    attn_dogs = attn.data[0, 0, 0]  # head 0, position 0 ("dogs")
+    attn_cats = attn.data[0, 0, 3]  # head 0, position 3 ("cats")
+
+    # dogs and cats have identical embeddings → expect similar attention patterns
+    np.testing.assert_allclose(attn_dogs, attn_cats, atol=1e-4)
+
+    # sanity: attention scores are normalized
+    assert np.isclose(attn_dogs.sum(), 1.0)
+    assert np.isclose(attn_cats.sum(), 1.0)
+
+    # ==== gradient propagation ====
+    # sum output and backward
+    out.sum().backward()
+
+    # gradients flowed through input
+    assert x.grad is not None, "Input tensor must receive gradient"
+    assert np.any(x.grad.data != 0), "Gradient through MHA must not be zero"
+
+
 if __name__ == '__main__':
     test_scaled_dot_product_attention()
     test_multihead_attention_output_shape()
@@ -132,3 +208,5 @@ if __name__ == '__main__':
     test_multihead_attention_forward_deterministic()
     test_multihead_attention_backward()
     test_attention_cat_attends_to_mat()
+    test_mha_cat_equals_mat_attention()
+    test_mha_attention_semantics_and_gradients()
