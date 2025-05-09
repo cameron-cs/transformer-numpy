@@ -429,7 +429,11 @@ class Tensor:
         def _backward():
             if self.requires_grad:
                 inverse = np.argsort(axes)
-                self.grad += out.grad.transpose(inverse)
+                grad_self = out.grad.transpose(inverse)
+                if self.grad is None:
+                    self.grad = grad_self
+                else:
+                    self.grad += grad_self
 
         out._backward = _backward
         return out

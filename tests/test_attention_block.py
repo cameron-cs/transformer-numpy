@@ -108,7 +108,7 @@ def test_attention_cat_attends_to_mat():
     qkv_data = [vocab[token].data[0, 0, 0] for token in sentence]
 
     # the qkv tensor using Tensor API (shape: (B=1, H=1, L=5, D=2))
-    qkv_tensor = Tensor(np.array(qkv_data).reshape(1, 1, 5, 2))  # Tensor wrapping np.array
+    qkv_tensor = Tensor(np.array(qkv_data)).reshape(1, 1, 5, 2)
     q = k = v = qkv_tensor
 
     # 3: attention
