@@ -34,17 +34,17 @@ class NormLayer(Module):
     def forward(self, x: Tensor) -> Tensor:
         # 1: compute the mean across the last dimension (feature dim)
         # shape: same as x, but with last dim reduced (or kept if keepdim=True)
-        mean = x.mean(axis=-1, keepdim=True)
+        mean: Tensor = x.mean(axis=-1, keepdim=True)
 
         # 2: compute the variance across the last dimension
         # `unbiased=False` uses population variance (divides by N), consistent with PyTorch default
-        var = x.var(axis=-1, unbiased=False, keepdim=True)
+        var: Tensor = x.var(axis=-1, unbiased=False, keepdim=True)
 
-        std = (var + self.eps).sqrt()
+        std: Tensor = (var + self.eps).sqrt()
 
         # 3: normalise the input
         # (x - mean) / sqrt(var + eps)  -- per sample normalisation
-        normed = (x - mean) / std
+        normed: Tensor = (x - mean) / std
 
         # 4: apply affine transformation using learnable scale and shift
         # gamma and beta are broadcasted over batch and spatial dims

@@ -21,7 +21,7 @@ class Module:
         """
         raise NotImplementedError
 
-    def __call__(self, *args, **kwargs):
+    def __call__(self, *args: object, **kwargs: object) -> object:
         return self.forward(*args, **kwargs)
 
     def zero_grad(self):

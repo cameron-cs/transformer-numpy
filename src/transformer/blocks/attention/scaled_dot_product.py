@@ -65,7 +65,7 @@ class ScaledDotProductAttentionBlock(Module):
 
         # === 4. normalise scores via softmax ===
         # converts scores into probabilities (attention weights)
-        score = self.softmax(score)
+        score: Tensor = self.softmax(score)
 
         # === 5. weighted sum of values ===
         # multiply attention weights with value vectors

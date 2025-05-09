@@ -29,8 +29,8 @@ class MultiHeadAttentionBlock(Module):
         out, _ = self.attention(q, k, v, mask)
 
         # 4. concat and pass to linear layer
-        out = self.concat(out)
-        out = self.linear_wo(out)
+        out: Tensor = self.concat(out)
+        out: Tensor = self.linear_wo(out)
 
         return out
 

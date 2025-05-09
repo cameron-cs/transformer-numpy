@@ -26,8 +26,8 @@ class PositionalEncodingLayer(Module):
         """
     def __init__(self, d_model, max_seq_len):
         super(PositionalEncodingLayer, self).__init__()
-        pos = Tensor.arange(0, max_seq_len).float().unsqueeze(1)  # [max_len, 1]
-        two_i = Tensor.arange(0, d_model, 2).float()  # [d_model // 2]
+        pos: Tensor = Tensor.arange(0, max_seq_len).float().unsqueeze(1)  # [max_len, 1]
+        two_i: Tensor = Tensor.arange(0, d_model, 2).float()  # [d_model // 2]
 
         # the divisor term: 10000 ** (2i / d_model)
         denominator = (10000 ** (two_i.data / d_model)).reshape(1, -1)  # [1, d_model // 2]
