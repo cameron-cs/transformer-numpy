@@ -14,7 +14,7 @@ class MultiHeadAttentionBlock(Module):
     Args:
         h (int): The number of attention heads.
         d_model (int): The dimensionality of the model (input/output size).
-        dropout_p (float, optional): Dropout probability for regularization (default is 0.1).
+        dropout_p (float, optional): Dropout probability for regularisation (default is 0.1).
 
     Attributes:
         h (int): Number of attention heads.
