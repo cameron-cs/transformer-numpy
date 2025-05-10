@@ -5,7 +5,7 @@ from src.parameter import Parameter
 from src.nn import Module
 
 
-class NormLayer(Module):
+class LayerNorm(Module):
     """
       Applies normalisation over the last dimension of the input tensor
       (typically the embedding or feature dimension), followed by learnable
@@ -27,6 +27,7 @@ class NormLayer(Module):
           Output: Tensor of the same shape
       """
     def __init__(self, d_model, eps):
+        super(LayerNorm, self).__init__()
         self.gamma = Parameter(np.ones(d_model))
         self.beta = Parameter(np.zeros(d_model))
         self.eps = eps

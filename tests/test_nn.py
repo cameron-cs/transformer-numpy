@@ -2,7 +2,7 @@ import numpy as np
 
 from src.nn import Dropout
 from src.tensor import Tensor
-from src.transformer.layer.norm.norm import NormLayer
+from src.transformer.layer.norm.norm import LayerNorm
 
 
 def test_dropout_backward():
@@ -28,19 +28,19 @@ def test_dropout_training_mode():
     assert abs(num_twos - 500) < 100, "Remaining values scaled properly"
 
 
-def test_normlayer_forward_shape():
+def test_layernorm_forward_shape():
     x = Tensor(np.random.randn(4, 10), requires_grad=True)
-    norm = NormLayer(d_model=10, eps=1e-5)
+    norm = LayerNorm(d_model=10, eps=1e-5)
     out = norm(x)
     assert out.data.shape == x.data.shape, "Output shape must match input shape"
 
 
-def test_normlayer_forward_mean_std():
+def test_layernorm_forward_mean_std():
     x = Tensor(np.random.randn(2, 4), requires_grad=True)
-    norm = NormLayer(d_model=4, eps=1e-5)
+    norm = LayerNorm(d_model=4, eps=1e-5)
     out = norm(x)
 
-    # remove scale/shift to test normalized values
+    # remove scale/shift to test normalised values
     unscaled = (out - norm.beta) / norm.gamma
 
     # mean and variance across last dim
@@ -51,9 +51,9 @@ def test_normlayer_forward_mean_std():
     assert np.allclose(std, 1, atol=1e-3), f"Std not one: {std}"
 
 
-def test_normlayer_backward_passes():
+def test_layernorm_backward_passes():
     x = Tensor(np.random.randn(3, 5), requires_grad=True)
-    norm = NormLayer(d_model=5, eps=1e-5)
+    norm = LayerNorm(d_model=5, eps=1e-5)
     out = norm(x)
     out.sum().backward()
 
@@ -65,6 +65,6 @@ def test_normlayer_backward_passes():
 if __name__ == '__main__':
     test_dropout_training_mode()
     test_dropout_backward()
-    test_normlayer_forward_shape()
-    test_normlayer_forward_mean_std()
-    test_normlayer_backward_passes()
+    test_layernorm_forward_shape()
+    test_layernorm_forward_mean_std()
+    test_layernorm_backward_passes()

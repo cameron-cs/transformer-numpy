@@ -196,7 +196,7 @@ def test_mha_attention_semantics_and_gradients():
     # dogs and cats have identical embeddings → expect similar attention patterns
     np.testing.assert_allclose(attn_dogs, attn_cats, atol=1e-4)
 
-    # sanity: attention scores are normalized
+    # sanity: attention scores are normalised
     assert np.isclose(attn_dogs.sum(), 1.0)
     assert np.isclose(attn_cats.sum(), 1.0)
 
