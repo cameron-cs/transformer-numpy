@@ -2,6 +2,7 @@ import math
 
 import numpy as np
 
+from src import nn
 from src.tensor import Tensor
 from src.transformer.blocks.attention.multi_head_attention import MultiHeadAttentionBlock
 from src.transformer.blocks.attention.scaled_dot_product import ScaledDotProductAttentionBlock
@@ -174,12 +175,19 @@ def test_mha_attention_semantics_and_gradients():
 
     mha = MultiHeadAttentionBlock(h=2, d_model=4)
 
+    class IdentityLinear(nn.Module):
+        def forward(self, x): return x
+
+    mha.linear_wq = IdentityLinear()
+    mha.linear_wk = IdentityLinear()
+    mha.linear_wv = IdentityLinear()
+
     out = mha(x, x, x)
 
     # ==== attention similarity ====
-    q = mha.split(mha.linear_wq(x))
-    k = mha.split(mha.linear_wk(x))
-    v = mha.split(mha.linear_wv(x))
+    q = mha.split(x)
+    k = mha.split(x)
+    v = mha.split(x)
     _, attn = mha.attention(q, k, v)
 
     attn_dogs = attn.data[0, 0, 0]  # head 0, position 0 ("dogs")
@@ -201,6 +209,78 @@ def test_mha_attention_semantics_and_gradients():
     assert np.any(x.grad.data != 0), "Gradient through MHA must not be zero"
 
 
+def test_mha_semantic_attention_and_gradient_check():
+    # semantic vocab with embedding dim 4
+    vocab = {
+        "king": Tensor([[[[1.0, 0.0, 0.0, 0.0]]]]),
+        "queen": Tensor([[[[0.9, 0.1, 0.0, 0.0]]]]),
+        "sat": Tensor([[[[0.0, 1.0, 0.0, 0.0]]]]),
+        "on": Tensor([[[[0.0, 0.9, 0.1, 0.0]]]]),
+        "throne": Tensor([[[[0.0, 0.8, 0.2, 0.0]]]]),
+        "wearing": Tensor([[[[0.0, 0.0, 1.0, 0.0]]]]),
+        "golden": Tensor([[[[0.0, 0.0, 0.9, 0.1]]]]),
+        "crown": Tensor([[[[0.0, 0.0, 0.8, 0.2]]]]),
+    }
+
+    sentence = ["king", "queen", "sat", "on", "throne", "wearing", "golden", "crown"]
+    x_np = np.stack([vocab[t].data[0, 0, 0] for t in sentence])  # (8, 4)
+    x = Tensor(x_np[None, :, :])  # (1, 8, 4)
+    x.requires_grad = True
+
+    mha = MultiHeadAttentionBlock(h=2, d_model=4)
+
+    # === force identity projections for Q, K, V ===
+    identity_matrix = np.eye(4)
+    for linear in [mha.linear_wq, mha.linear_wk, mha.linear_wv]:
+        linear.weights.data[:] = identity_matrix
+        linear.bias.data[:] = np.zeros_like(linear.bias.data)
+
+    # === forward and backward ===
+    out = mha(x, x, x)
+    out.sum().backward()
+
+    # === attention weights ===
+    q = mha.split(mha.linear_wq(x))
+    k = mha.split(mha.linear_wk(x))
+    v = mha.split(mha.linear_wv(x))
+    _, attn = mha.attention(q, k, v)
+
+    idx = sentence.index("queen")
+    attn_weights = attn.data[0, 0, idx]
+
+    print("\nAttention from 'queen':")
+    for token, weight in zip(sentence, attn_weights):
+        print(f"{token:>8}: {weight:.3f}")
+
+    assert attn_weights[sentence.index("king")] > 0.15
+    assert attn_weights[sentence.index("crown")] > 0.1
+
+    # === gumerical grad check ===
+    epsilon = 1e-4
+    analytical_grad = np.array(x.grad.data)
+    numerical_grad = np.zeros_like(x.data)
+
+    for i in range(x.data.shape[1]):
+        for j in range(x.data.shape[2]):
+            orig = x.data[0, i, j]
+
+            x.data[0, i, j] = orig + epsilon
+            out_plus = mha(x, x, x).sum().data
+
+            x.data[0, i, j] = orig - epsilon
+            out_minus = mha(x, x, x).sum().data
+
+            num_grad = (out_plus - out_minus) / (2 * epsilon)
+            numerical_grad[0, i, j] = num_grad
+
+            x.data[0, i, j] = orig
+
+    diff = np.abs(numerical_grad - analytical_grad)
+    max_diff = diff.max()
+
+    assert max_diff < 1e-2, f"Gradient check failed! Max diff too large: {max_diff}"
+
+
 if __name__ == '__main__':
     test_scaled_dot_product_attention()
     test_multihead_attention_output_shape()
@@ -210,3 +290,4 @@ if __name__ == '__main__':
     test_attention_cat_attends_to_mat()
     test_mha_cat_equals_mat_attention()
     test_mha_attention_semantics_and_gradients()
+    test_mha_semantic_attention_and_gradient_check()
