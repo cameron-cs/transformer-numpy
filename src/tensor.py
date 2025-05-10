@@ -19,7 +19,7 @@ class Tensor:
     """
 
     def __init__(self, data: Union[np.ndarray, float, int], requires_grad: bool = False,
-                 _children: Tuple['Tensor', ...] = (), _op: str = ''):
+                 _children: Tuple['Tensor', ...] = (), _op: str = '', name: Optional[str]=''):
         """
         Initialise a Tensor object.
 
@@ -35,9 +35,16 @@ class Tensor:
         self._backward = lambda: None
         self._prev = set(_children)
         self._op = _op
+        self.name = f"Tensor{name if name else id(data)}"
 
     def __repr__(self):
         return f"Tensor(data={self.data}, grad={self.grad})"
+
+    def prev(self):
+        return self._prev
+
+    def op(self):
+        return self._op
 
     def backward(self, grad: np.ndarray = None) -> None:
         """
