@@ -47,6 +47,8 @@ class MultiHeadAttentionBlock(Module):
                                                                                            [head1] [head2] [head3] . . . . . .  [ H ]       x     [ Wo ]        =     [ MH-A ]
                                                                                                                            (seq, h * d_v)    (h * dvT d_model)    (seq, d_model)
 
+                                                                                                               MultiHead(Q, K, V) = Concat(head1, ..., head h) x Wo
+
     """
     def __init__(self, h: int, d_model: int, dropout: float):
         self.h = h
