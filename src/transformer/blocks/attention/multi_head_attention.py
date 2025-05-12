@@ -44,8 +44,8 @@ class MultiHeadAttentionBlock(Module):
                                     head i = Attention(QW(q,i), KW(k,i), VW(v,i))             .       .      .
                                                                                               .    d_model   .
                                                                                              (d_v)  (d_v)  (d_v)
-                                                                                            [head] [head]  [head] . . . . .  [ H ]       x     [ Wo ]        =     [ MH-A ]
-                                                                                                                         (seq, h * d_v)    (h * dvT d_model)    (seq, d_model)
+                                                                                           [head1] [head2] [head3] . . . . . .  [ H ]       x     [ Wo ]        =     [ MH-A ]
+                                                                                                                           (seq, h * d_v)    (h * dvT d_model)    (seq, d_model)
 
     """
     def __init__(self, h: int, d_model: int, dropout: float):
