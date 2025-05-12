@@ -1,6 +1,6 @@
 import math
 
-from src.nn import Module, Softmax
+from src.nn import Module, Softmax, Dropout
 from src.tensor import Tensor
 
 
@@ -25,11 +25,12 @@ class ScaledDotProductAttentionBlock(Module):
 
     This implementation supports optional masking, and is compatible with your custom autograd-enabled `Tensor` class.
     """
-    def __init__(self):
+    def __init__(self, dropout: float):
         super(ScaledDotProductAttentionBlock, self).__init__()
         self.softmax = Softmax()
+        self.dropout = Dropout(dropout)
 
-    def forward(self, q: 'Tensor', k: 'Tensor', v: 'Tensor', mask=None, e=1e-12):
+    def forward(self, q: Tensor, k: Tensor, v: Tensor, mask=None, e=1e-12):
         """
         Performs the forward pass of scaled dot-product attention.
 
@@ -46,7 +47,7 @@ class ScaledDotProductAttentionBlock(Module):
                 - output: (B, H, L_q, d_v), the result of attention computation.
                 - score:  (B, H, L_q, L_k), the attention weights after softmax.
         """
-        d_tensor = q.size(-1)
+        d_k = q.shape()[-1]
         # === 1. transpose key tensor for dot product ===
         # Kᵀ: transpose last two dims to prepare for batch matmul
         kT: Tensor = k.transpose(2, 3)  # (B, H, d_k, L_k)
@@ -54,7 +55,7 @@ class ScaledDotProductAttentionBlock(Module):
         # === 2. compute raw attention scores ===
         # Q @ Kᵀ: similarity between each query and key, scaled
         qkT: Tensor = q @ kT  # shape: (B, H, L_q, L_k)
-        Vdk: float = math.sqrt(d_tensor)  # scale factor √d_k
+        Vdk: float = math.sqrt(d_k)  # scale factor √d_k
 
         score: Tensor = qkT / Vdk  # scaled dot product scores
 
@@ -63,9 +64,10 @@ class ScaledDotProductAttentionBlock(Module):
             # set masked positions to -inf before softmax
             score = score.masked_fill(mask == 0, float('-inf'))
 
-        # === 4. normalise scores via softmax ===
+        # === 4. normalise scores via softmax and apply dropout===
         # converts scores into probabilities (attention weights)
         score: Tensor = self.softmax(score)
+        score: Tensor = self.dropout(score)
 
         # === 5. weighted sum of values ===
         # multiply attention weights with value vectors

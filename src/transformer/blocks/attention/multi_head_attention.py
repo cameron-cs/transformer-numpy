@@ -14,7 +14,7 @@ class MultiHeadAttentionBlock(Module):
     Args:
         h (int): The number of attention heads.
         d_model (int): The dimensionality of the model (input/output size).
-        dropout_p (float, optional): Dropout probability for regularisation (default is 0.1).
+        dropout (float, optional): Dropout probability for regularisation (default is 0.1).
 
     Attributes:
         h (int): Number of attention heads.
@@ -25,16 +25,17 @@ class MultiHeadAttentionBlock(Module):
         linear_wv (Linear): Linear layer for value transformation.
         linear_wo (Linear): Linear layer for output transformation after concatenating attention heads.
     """
-    def __init__(self, h, d_model, dropout_p=0.1):
+    def __init__(self, h: int, d_model: int, dropout: float):
         self.h = h
         self.d_model = d_model
-        self.attention = ScaledDotProductAttentionBlock()
-        self.linear_wq = Linear(d_model, d_model)
-        self.linear_wk = Linear(d_model, d_model)
-        self.linear_wv = Linear(d_model, d_model)
-        self.linear_wo = Linear(d_model, d_model)
+        self.d_k = d_model // h
+        self.attention = ScaledDotProductAttentionBlock(dropout)
+        self.linear_wq = Linear(d_model, d_model)  # Wq
+        self.linear_wk = Linear(d_model, d_model)  # Wk
+        self.linear_wv = Linear(d_model, d_model)  # Wv
+        self.linear_wo = Linear(d_model, d_model)  # Wo
 
-    def forward(self, q: 'Tensor', k: 'Tensor', v: 'Tensor', mask=None) -> 'Tensor':
+    def forward(self, q: Tensor, k: Tensor, v: Tensor, mask=None) -> Tensor:
         """
         Perform the forward pass of the multi-head attention block.
 
@@ -52,11 +53,15 @@ class MultiHeadAttentionBlock(Module):
             Tensor: The output of multi-head attention with shape [batch_size, length, d_model].
         """
         # 1. dot product with weight matrices
+        # Q'(seq,d_model) = Q(seq,d_model) x Wq(d_model,d_model)
         q: Tensor = self.linear_wq(q)
+        # K'(seq,d_model) = K(seq,d_model) x Wk(d_model,d_model)
         k: Tensor = self.linear_wk(k)
+        # V'(seq,d_model) = V(seq,d_model) x Wv(d_model,d_model)
         v: Tensor = self.linear_wv(v)
 
         # 2. split tensor by number of heads
+        # (batch, seq_len, d_model) --> (batch, seq_len, h, d_k) --> (batch, h, seq_len, d_k)
         q: Tensor = self.split(q)
         k: Tensor = self.split(k)
         v: Tensor = self.split(v)
@@ -70,7 +75,7 @@ class MultiHeadAttentionBlock(Module):
 
         return out
 
-    def split(self, tensor: 'Tensor') -> 'Tensor':
+    def split(self, tensor: Tensor) -> Tensor:
         """
         Split the input tensor into multiple heads.
 
@@ -81,15 +86,13 @@ class MultiHeadAttentionBlock(Module):
             tensor (Tensor): The input tensor with shape [batch_size, length, d_model].
 
         Returns:
-            Tensor: The reshaped tensor with shape [batch_size, head, length, d_tensor],
+            Tensor: The reshaped tensor with shape [batch_size, head, length, d_k],
                     where d_tensor = d_model / h is the dimensionality of each attention head.
         """
-        batch_size, length, d_model = tensor.size()
-        d_tensor = d_model // self.h
-        tensor = tensor.view(batch_size, length, self.h, d_tensor).transpose(1, 2)
+        tensor = tensor.view(tensor.shape()[0], tensor.shape()[1], self.h, self.d_k).transpose(1, 2)
         return tensor
 
-    def concat(self, tensor: 'Tensor'):
+    def concat(self, tensor: Tensor) -> Tensor:
         """
         Concatenate the outputs of all attention heads.
 
@@ -98,13 +101,10 @@ class MultiHeadAttentionBlock(Module):
 
         Args:
             tensor (Tensor): The tensor representing the outputs of the attention heads,
-                             with shape [batch_size, head, length, d_tensor].
+                             with shape [batch_size, head, seq_len, dk].
 
         Returns:
-            Tensor: The concatenated tensor with shape [batch_size, length, d_model].
+            Tensor: The concatenated tensor with shape [batch_size, seq_len, d_model].
         """
-        batch_size, head, length, d_tensor = tensor.size()
-        d_model = head * d_tensor
-
-        tensor = tensor.transpose(1, 2).contiguous().view(batch_size, length, d_model)
+        tensor: Tensor = tensor.transpose(1, 2).contiguous().view(tensor.shape()[0], -1, self.h * self.d_k)
         return tensor

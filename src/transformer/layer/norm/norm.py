@@ -5,7 +5,7 @@ from src.parameter import Parameter
 from src.nn import Module
 
 
-class LayerNorm(Module):
+class NormLayer(Module):
     """
       Applies normalisation over the last dimension of the input tensor
       (typically the embedding or feature dimension), followed by learnable
@@ -26,8 +26,8 @@ class LayerNorm(Module):
           Input: Tensor of shape (batch_size, ..., d_model)
           Output: Tensor of the same shape
       """
-    def __init__(self, d_model, eps):
-        super(LayerNorm, self).__init__()
+    def __init__(self, d_model, eps: 10**-6):
+        super(NormLayer, self).__init__()
         self.gamma = Parameter(np.ones(d_model))
         self.beta = Parameter(np.zeros(d_model))
         self.eps = eps
@@ -38,7 +38,7 @@ class LayerNorm(Module):
         mean: Tensor = x.mean(axis=-1, keepdim=True)
 
         # 2: compute the variance across the last dimension
-        # `unbiased=False` uses population variance (divides by N), consistent with PyTorch default
+        # `unbiased=False` uses population variance (divides by N)
         var: Tensor = x.var(axis=-1, unbiased=False, keepdim=True)
 
         std: Tensor = (var + self.eps).sqrt()

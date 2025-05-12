@@ -130,6 +130,33 @@ class Dropout(Module):
         return out
 
 
+class Embedding(Module):
+
+    def __init__(self, num_embeddings, embedding_dim):
+        super().__init__()
+        weight = np.random.randn(num_embeddings, embedding_dim) * (1.0 / np.sqrt(num_embeddings))
+        self.weight = Tensor(weight, requires_grad=True)
+
+    def forward(self, input: Tensor) -> Tensor:
+        indices = input.data.astype(int)  # or np.int64
+        # indices: shape (N,) or (B, T) → use advanced indexing
+        out_data = self.weight.data[indices]
+        out = Tensor(out_data, requires_grad=self.weight.requires_grad)
+
+        # save backward info
+        def _backward():
+            if self.weight.requires_grad:
+                if self.weight.grad is None:
+                    self.weight.grad = np.zeros_like(self.weight.data)
+                    # scatter-add gradients for repeated indices
+                np.add.at(self.weight.grad, indices, out.grad)
+
+        out._backward = _backward
+        out._prev = [self.weight]
+        out._op = 'embedding'
+        return out
+
+
 class Softmax(Module):
     """
      Applies the softmax function to the input tensor along the specified axis.

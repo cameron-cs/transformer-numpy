@@ -40,6 +40,9 @@ class Tensor:
     def __repr__(self):
         return f"Tensor(data={self.data}, grad={self.grad})"
 
+    def requires_grad(self, req_grad):
+        self.requires_grad = req_grad
+
     def prev(self):
         return self._prev
 
