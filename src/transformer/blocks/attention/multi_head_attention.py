@@ -24,6 +24,29 @@ class MultiHeadAttentionBlock(Module):
         linear_wk (Linear): Linear layer for key transformation.
         linear_wv (Linear): Linear layer for value transformation.
         linear_wo (Linear): Linear layer for output transformation after concatenating attention heads.
+
+                                                                                                   d_model
+                                                                                             (d_k)  (d_k)  (d_k)
+                      . . . . [ Q ]          @     [ Wq ]        =     [  Q' ] . . . . . .   [Q1]    [Q2]   [Q3]
+                      .    (seq, d_model)       (seq, d_model)      (seq, d_model)            .       .      .
+                      .                                                                       .       .      .
+                      .                                                                       .       .      .
+                      .                                                                       .       .      .
+    [ Input ] . . . . . . . . [ K ]          @     [ Wk ]        =     [  K' ] . . . . . .  [K1]    [K2]   [K3]
+ (seq, d_model)       .    (seq, d_model)       (seq, d_model)      (seq, d_model)            .       .      .
+                      .                                                                       .       .      .
+                      .                                                                       .       .      .
+                      .                                                                       .       .      .
+                      . . . . [ V ]          @     [ Wv ]        =     [  V' ] . . . . . .  [V1]    [V2]   [V3]
+                           (seq, d_model)       (seq, d_model)      (seq, d_model)            .       .      .
+                                                                                              .       .      .
+                            Attention(Q, K, V) = softmax(Q @ Kᵀ/ sqrt(d_k) * V                .       .      .
+                                    head i = Attention(QW(q,i), KW(k,i), VW(v,i))             .       .      .
+                                                                                              .    d_model   .
+                                                                                             (d_v)  (d_v)  (d_v)
+                                                                                            [head] [head]  [head] . . . . .  [ H ]       x     [ Wo ]        =     [ MH-A ]
+                                                                                                                         (seq, h * d_v)    (h * dvT d_model)    (seq, d_model)
+
     """
     def __init__(self, h: int, d_model: int, dropout: float):
         self.h = h
@@ -62,6 +85,7 @@ class MultiHeadAttentionBlock(Module):
 
         # 2. split tensor by number of heads
         # (batch, seq_len, d_model) --> (batch, seq_len, h, d_k) --> (batch, h, seq_len, d_k)
+        # we split embeddings not sentences
         q: Tensor = self.split(q)
         k: Tensor = self.split(k)
         v: Tensor = self.split(v)

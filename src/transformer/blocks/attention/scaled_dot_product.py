@@ -22,8 +22,6 @@ class ScaledDotProductAttentionBlock(Module):
         - L_k: key/value length
         - d_k: key dimension
         - d_v: value dimension
-
-    This implementation supports optional masking, and is compatible with your custom autograd-enabled `Tensor` class.
     """
     def __init__(self, dropout: float):
         super(ScaledDotProductAttentionBlock, self).__init__()
@@ -47,6 +45,7 @@ class ScaledDotProductAttentionBlock(Module):
                 - output: (B, H, L_q, d_v), the result of attention computation.
                 - score:  (B, H, L_q, L_k), the attention weights after softmax.
         """
+        # the last dimension of Q, K, V
         d_k = q.shape()[-1]
         # === 1. transpose key tensor for dot product ===
         # Kᵀ: transpose last two dims to prepare for batch matmul
@@ -55,9 +54,9 @@ class ScaledDotProductAttentionBlock(Module):
         # === 2. compute raw attention scores ===
         # Q @ Kᵀ: similarity between each query and key, scaled
         qkT: Tensor = q @ kT  # shape: (B, H, L_q, L_k)
-        Vdk: float = math.sqrt(d_k)  # scale factor √d_k
+        Vd_k: float = math.sqrt(d_k)  # scale factor √d_k
 
-        score: Tensor = qkT / Vdk  # scaled dot product scores
+        score: Tensor = qkT / Vd_k  # scaled dot product scores
 
         # === 3. optional mask ===
         if mask:
