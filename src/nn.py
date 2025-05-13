@@ -92,6 +92,46 @@ class Sequential(Module):
         return params
 
 
+class ModuleList(Module):
+    """
+    Container module that holds submodules in a list.
+    Useful when the number of submodules is dynamic or not known in advance.
+
+    Example:
+        layers = ModuleList([Linear(10, 20), Linear(20, 30)])
+        for layer in layers:
+            x = layer(x)
+    """
+
+    def __init__(self, modules: list[Module]):
+        super().__init__()
+        self.modules = modules
+
+    def __getitem__(self, idx: int) -> Module:
+        return self.modules[idx]
+
+    def __setitem__(self, idx: int, module: Module):
+        self.modules[idx] = module
+
+    def __len__(self) -> int:
+        return len(self.modules)
+
+    def __iter__(self):
+        return iter(self.modules)
+
+    def forward(self, *args, **kwargs):
+        raise NotImplementedError("ModuleList itself does not implement forward. Iterate manually.")
+
+    def parameters(self):
+        """
+        Collects parameters from all child modules.
+        """
+        params = []
+        for module in self.modules:
+            params.extend(module.parameters())
+        return params
+
+
 class Dropout(Module):
     """
     Dropout layer for regularisation.

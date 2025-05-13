@@ -26,7 +26,7 @@ class NormLayer(Module):
           Input: Tensor of shape (batch_size, ..., d_model)
           Output: Tensor of the same shape
       """
-    def __init__(self, d_model, eps: 10**-6):
+    def __init__(self, d_model, eps: int = 10**-6):
         super(NormLayer, self).__init__()
         self.gamma = Parameter(np.ones(d_model))
         self.beta = Parameter(np.zeros(d_model))
