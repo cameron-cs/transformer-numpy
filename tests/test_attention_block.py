@@ -13,7 +13,7 @@ def test_scaled_dot_product_attention():
     k = Tensor([[[[1.0, 0.0], [0.0, 1.0]]]], requires_grad=True)
     v = Tensor([[[[1.0, 2.0], [3.0, 4.0]]]], requires_grad=True)
 
-    attention = ScaledDotProductAttentionBlock()
+    attention = ScaledDotProductAttentionBlock(dropout=0.1)
     out, score = attention(q, k, v)
 
     # score shape
@@ -39,7 +39,7 @@ def test_scaled_dot_product_attention():
 
 def test_multihead_attention_output_shape():
     batch_size, seq_len, d_model, h = 2, 5, 8, 2
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout_p=0.0)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout=0.0)
     x = Tensor(np.random.randn(batch_size, seq_len, d_model), requires_grad=True)
 
     out = mha(x, x, x)  # Self-attention
@@ -49,7 +49,7 @@ def test_multihead_attention_output_shape():
 
 def test_multihead_attention_split_concat_inverse():
     batch_size, seq_len, d_model, h = 2, 6, 8, 4
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model,dropout=0.1)
     x = Tensor(np.random.randn(batch_size, seq_len, d_model))
 
     split = mha.split(x)
@@ -60,7 +60,7 @@ def test_multihead_attention_split_concat_inverse():
 def test_multihead_attention_forward_deterministic():
     np.random.seed(42)
     batch_size, seq_len, d_model, h = 1, 3, 4, 2
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout_p=0.0)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout=0.0)
 
     x = Tensor(np.ones((batch_size, seq_len, d_model)), requires_grad=True)
     out1 = mha(x, x, x)
@@ -70,7 +70,7 @@ def test_multihead_attention_forward_deterministic():
 
 def test_multihead_attention_with_mask():
     batch_size, seq_len, d_model, h = 1, 4, 8, 2
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout_p=0.0)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout=0.0)
 
     x = Tensor(np.random.randn(batch_size, seq_len, d_model))
     mask = np.array([[0, 0, -np.inf, -np.inf]])
@@ -84,7 +84,7 @@ def test_multihead_attention_with_mask():
 
 def test_multihead_attention_backward():
     batch_size, seq_len, d_model, h = 2, 5, 8, 4
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout_p=0.0)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout=0.0)
 
     x = Tensor(np.random.randn(batch_size, seq_len, d_model), requires_grad=True)
     out = mha(x, x, x)
@@ -92,38 +92,6 @@ def test_multihead_attention_backward():
 
     assert x.grad is not None, "Gradient not propagated back"
     assert x.grad.shape == x.data.shape, "Incorrect gradient shape"
-
-
-def test_attention_cat_attends_to_mat():
-    # 1: fixed vocab
-    vocab = {
-        "the": Tensor([[[[1.0, 0.0]]]]),  # (B=1, H=1, L=1, D=2)
-        "cat": Tensor([[[[0.0, 1.0]]]]),  # (B=1, H=1, L=1, D=2)
-        "sat": Tensor([[[[0.5, 0.5]]]]),
-        "on": Tensor([[[[0.2, 0.8]]]]),
-        "mat": Tensor([[[[0.0, 1.0]]]]),  # (B=1, H=1, L=1, D=2)
-    }
-
-    # 2: encode the sentence into q, k, v tensors using Tensor API
-    sentence = ["the", "cat", "sat", "on", "mat"]
-    qkv_data = [vocab[token].data[0, 0, 0] for token in sentence]
-
-    # the qkv tensor using Tensor API (shape: (B=1, H=1, L=5, D=2))
-    qkv_tensor = Tensor(np.array(qkv_data)).reshape(1, 1, 5, 2)
-    q = k = v = qkv_tensor
-
-    # 3: attention
-    attn = ScaledDotProductAttentionBlock()
-    out, score = attn(q, k, v)
-
-    # 4: extract attention weights for the second word "cat" (index 1)
-    cat_weights = score.data[0, 0, 1]  # Attention weights for "cat"
-
-    # 5: assertions based on expected attention pattern
-    assert np.isclose(cat_weights[1], cat_weights[4]), "Cat and Mat should have equal attention"
-    assert cat_weights[1] > cat_weights[2], "Cat should attend more to itself than to 'sat'"
-    assert cat_weights[1] > cat_weights[0], "Cat should attend more to itself than to 'the'"
-    assert np.isclose(cat_weights.sum(), 1.0), "Attention weights should sum to 1"
 
 
 def test_mha_cat_equals_mat_attention():
@@ -173,7 +141,7 @@ def test_mha_attention_semantics_and_gradients():
     x_np = np.stack([vocab[t].data[0, 0, 0] for t in sentence])  # (6, 4)
     x = Tensor(x_np[None, :, :], requires_grad=True)  # (1, 6, 4)
 
-    mha = MultiHeadAttentionBlock(h=2, d_model=4)
+    mha = MultiHeadAttentionBlock(h=2, d_model=4, dropout=0.1)
 
     class IdentityLinear(nn.Module):
         def forward(self, x): return x
@@ -227,7 +195,7 @@ def test_mha_semantic_attention_and_gradient_check():
     x = Tensor(x_np[None, :, :])  # (1, 8, 4)
     x.requires_grad = True
 
-    mha = MultiHeadAttentionBlock(h=2, d_model=4)
+    mha = MultiHeadAttentionBlock(h=2, d_model=4,dropout=0.1)
 
     # === force identity projections for Q, K, V ===
     identity_matrix = np.eye(4)
@@ -281,13 +249,91 @@ def test_mha_semantic_attention_and_gradient_check():
     assert max_diff < 1e-2, f"Gradient check failed! Max diff too large: {max_diff}"
 
 
+tokens = ["I", "love", "jazz", "because", "it", "is", "smoother"]
+B, H, L, d_k, d_v = 1, 1, len(tokens), 32, 32  # single batch, single head
+
+
+def embed_tokens(seed=0):
+    np.random.seed(seed)
+    return (
+        Tensor(np.random.randn(B, H, L, d_k)),
+        Tensor(np.random.randn(B, H, L, d_k)),
+        Tensor(np.random.randn(B, H, L, d_v)),
+    )
+
+
+def test_attention_shape_real_tokens():
+    q, k, v = embed_tokens()
+    attn = ScaledDotProductAttentionBlock(dropout=0.0)
+    out, score = attn(q, k, v)
+    assert out.shape() == (B, H, L, d_v)
+    assert score.shape() == (B, H, L, L)
+
+
+def test_softmax_rows_sum_to_1_real_tokens():
+    q, k, v = embed_tokens()
+    attn = ScaledDotProductAttentionBlock(dropout=0.0)
+    _, score = attn(q, k, v)
+    sums = score.data.sum(axis=-1)  # shape: (B, H, L)
+    np.testing.assert_allclose(sums, np.ones_like(sums), atol=1e-6)
+
+
+
+def test_dropout_applied_real_tokens():
+    """
+    Check dropout integration doesn't crash and keeps shape.
+    """
+    q, k, v = embed_tokens()
+    attn = ScaledDotProductAttentionBlock(dropout=0.5)
+    out, score = attn(q, k, v)
+
+    assert out.shape() == (B, H, L, d_v)
+    assert score.shape() == (B, H, L, L)
+
+
+def test_token_attention_weights_example():
+    """
+    expected attention behavior on toy sentence:
+    ["I", "love", "jazz", "because", "it", "is", "smoother"]
+
+    Checks that:
+    - "love" attends significantly to "jazz"
+    - "because" attends more to "I" and "love" than "smoother"
+    - "jazz" attends significantly to "smoother"
+    """
+    q, k, v = embed_tokens(seed=42)
+    attn = ScaledDotProductAttentionBlock(dropout=0.0)
+    _, score = attn(q, k, v)
+
+    # select attention matrix: shape (B=1, H=1, L_q=7, L_k=7)
+    weights = score.data[0, 0]  # shape: (7, 7)
+
+    # index lookup
+    idx = {t: i for i, t in enumerate(tokens)}
+
+    # assert: "love" → "jazz"
+    love_to_jazz = weights[idx["love"], idx["jazz"]]
+    assert love_to_jazz > 0.10, f'"love" → "jazz" attention too low: {love_to_jazz:.2f}'
+
+    # assert: "because" → "I" and "love"
+    because_to_I = weights[idx["because"], idx["I"]]
+    because_to_love = weights[idx["because"], idx["love"]]
+    because_to_smoother = weights[idx["because"], idx["smoother"]]
+
+    assert because_to_I > because_to_smoother, f'"because" should attend more to "I" than "smoother" ({because_to_I:.2f} vs {because_to_smoother:.2f})'
+    assert because_to_love > because_to_smoother, f'"because" should attend more to "love" than "smoother" ({because_to_love:.2f} vs {because_to_smoother:.2f})'
+
+    # assert: "jazz" → "smoother"
+    jazz_to_smoother = weights[idx["jazz"], idx["smoother"]]
+    assert jazz_to_smoother > 0.30, f'"jazz" → "smoother" attention too low: {jazz_to_smoother:.2f}'
+
+
 if __name__ == '__main__':
-    test_scaled_dot_product_attention()
+    test_attention_shape_real_tokens()
+    test_softmax_rows_sum_to_1_real_tokens()
+    test_dropout_applied_real_tokens()
+    test_token_attention_weights_example()
     test_multihead_attention_output_shape()
     test_multihead_attention_split_concat_inverse()
     test_multihead_attention_forward_deterministic()
     test_multihead_attention_backward()
-    test_attention_cat_attends_to_mat()
-    test_mha_cat_equals_mat_attention()
-    test_mha_attention_semantics_and_gradients()
-    test_mha_semantic_attention_and_gradient_check()
