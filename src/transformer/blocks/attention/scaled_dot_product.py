@@ -11,6 +11,23 @@ class ScaledDotProductAttentionBlock(Module):
     Attention maps a query to a set of key-value pairs.
     This determines which source elements to focus on during decoding.
 
+    ScaledDotProductAttentionBlock computes dynamic relationships between tokens using dot products between Q and K:
+        score[i][j] = Q[i] • K[j] / √d_k
+
+    PositionalEncodingLayer:
+        PE[1] = [0.8415, 0.5403, 0.0998, 0.995, 0.00999, 0.9999, ...]
+
+    Embedding("love") + PE[1] → new input with location-aware signal
+
+    This embedding contributes to:
+        - Q_love: how "love" queries other tokens
+        - K_love: how others attend to "love"
+        - V_love: value representation for "love"
+
+    Each query and key now includes positional bias → so attention is not just semantic, but sensitive to word order.
+
+    Q["love"] will have a different dot product with K["jazz"] vs K["because"], not just because of semantic meaning, but because of their position.
+
     Example sentence:
         Target: ["I", "love", "jazz", "because", "it", "is", "smoother"]
 
@@ -56,6 +73,10 @@ class ScaledDotProductAttentionBlock(Module):
     - Query2 ("love") is aligned vertically over all Key positions
     - Weights (w₁ to w₇) are shown directly below each Key
     - Final vector is a contextualised embedding for "love"
+
+    ScaledDotProductAttentionBlock uses the identity (from PositionalEncodingLayer) to learn who should talk to whom — while respecting position.
+
+    Without PositionalEncodingLayer, ScaledDotProductAttentionBlock is order-blind.
 
     This block computes attention weights and applies them to the value tensor, following the equation:
 

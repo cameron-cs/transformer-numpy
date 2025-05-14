@@ -39,7 +39,7 @@ def test_scaled_dot_product_attention():
 
 def test_multihead_attention_output_shape():
     batch_size, seq_len, d_model, h = 2, 5, 8, 2
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout=0.0)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, p_drop=0.0)
     x = Tensor(np.random.randn(batch_size, seq_len, d_model), requires_grad=True)
 
     out = mha(x, x, x)  # Self-attention
@@ -49,7 +49,7 @@ def test_multihead_attention_output_shape():
 
 def test_multihead_attention_split_concat_inverse():
     batch_size, seq_len, d_model, h = 2, 6, 8, 4
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model,dropout=0.1)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, p_drop=0.1)
     x = Tensor(np.random.randn(batch_size, seq_len, d_model))
 
     split = mha.split(x)
@@ -60,7 +60,7 @@ def test_multihead_attention_split_concat_inverse():
 def test_multihead_attention_forward_deterministic():
     np.random.seed(42)
     batch_size, seq_len, d_model, h = 1, 3, 4, 2
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout=0.0)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, p_drop=0.0)
 
     x = Tensor(np.ones((batch_size, seq_len, d_model)), requires_grad=True)
     out1 = mha(x, x, x)
@@ -70,7 +70,7 @@ def test_multihead_attention_forward_deterministic():
 
 def test_multihead_attention_with_mask():
     batch_size, seq_len, d_model, h = 1, 4, 8, 2
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout=0.0)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, p_drop=0.0)
 
     x = Tensor(np.random.randn(batch_size, seq_len, d_model))
     mask = np.array([[0, 0, -np.inf, -np.inf]])
@@ -84,7 +84,7 @@ def test_multihead_attention_with_mask():
 
 def test_multihead_attention_backward():
     batch_size, seq_len, d_model, h = 2, 5, 8, 4
-    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, dropout=0.0)
+    mha = MultiHeadAttentionBlock(h=h, d_model=d_model, p_drop=0.0)
 
     x = Tensor(np.random.randn(batch_size, seq_len, d_model), requires_grad=True)
     out = mha(x, x, x)
@@ -141,7 +141,7 @@ def test_mha_attention_semantics_and_gradients():
     x_np = np.stack([vocab[t].data[0, 0, 0] for t in sentence])  # (6, 4)
     x = Tensor(x_np[None, :, :], requires_grad=True)  # (1, 6, 4)
 
-    mha = MultiHeadAttentionBlock(h=2, d_model=4, dropout=0.1)
+    mha = MultiHeadAttentionBlock(h=2, d_model=4, p_drop=0.1)
 
     class IdentityLinear(nn.Module):
         def forward(self, x): return x
@@ -195,7 +195,7 @@ def test_mha_semantic_attention_and_gradient_check():
     x = Tensor(x_np[None, :, :])  # (1, 8, 4)
     x.requires_grad = True
 
-    mha = MultiHeadAttentionBlock(h=2, d_model=4,dropout=0.1)
+    mha = MultiHeadAttentionBlock(h=2, d_model=4, p_drop=0.1)
 
     # === force identity projections for Q, K, V ===
     identity_matrix = np.eye(4)

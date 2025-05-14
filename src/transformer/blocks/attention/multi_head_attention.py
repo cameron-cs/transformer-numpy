@@ -14,7 +14,7 @@ class MultiHeadAttentionBlock(Module):
     Args:
         h (int): The number of attention heads.
         d_model (int): The dimensionality of the model (input/output size).
-        dropout (float, optional): Dropout probability for regularisation (default is 0.1).
+        p_drop (float, optional): Dropout probability for regularisation (default is 0.1).
 
     Attributes:
         h (int): Number of attention heads.
@@ -50,11 +50,12 @@ class MultiHeadAttentionBlock(Module):
                                                                                                                MultiHead(Q, K, V) = Concat(head1, ..., head h) x Wo
 
     """
-    def __init__(self, h: int, d_model: int, dropout: float):
+    def __init__(self, h: int, d_model: int, p_drop: float = 0.1):
+        super(MultiHeadAttentionBlock, self).__init__()
         self.h = h
         self.d_model = d_model
         self.d_k = d_model // h
-        self.attention = ScaledDotProductAttentionBlock(dropout)
+        self.attention = ScaledDotProductAttentionBlock(p_drop)
         self.linear_wq = Linear(d_model, d_model)  # Wq
         self.linear_wk = Linear(d_model, d_model)  # Wk
         self.linear_wv = Linear(d_model, d_model)  # Wv

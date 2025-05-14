@@ -9,12 +9,29 @@ class PositionalEncodingLayer(Module):
         Compute the positional encoding for a given position and dimension index
         using the sinusoidal encoding scheme from the Transformer architecture.
 
+        Adds position-specific bias vectors to token embeddings
+
+        Token:        I        love       jazz     because     it       is      smoother
+        Position:     0          1          2         3         4        5         6
+                    ─────────────────────────────────────────────────────────────────────
+        Dim 0 (sin)  0        0.8415     0.9093     0.1411   -0.7568  -0.9589   -0.2794
+        Dim 1 (cos)  1        0.5403    -0.4161    -0.9899   -0.6536   0.2836    0.9602
+        Dim 2 (sin)  0        0.0998     0.1987     0.2955    0.3894   0.4794    0.5646
+        Dim 3 (cos)  1        0.9950     0.9801     0.9553    0.9210   0.8776    0.8253
+        Dim 4 (sin)  0        0.00999    0.01999    0.02998   0.03996  0.04993   0.05988
+        Dim 5 (cos)  1        0.9999     0.9998     0.9995    0.9992   0.9987    0.9982
+
         The formulas used are:
             PE(pos, 2i)   = sin(pos / (10000 ** (2i / d_model)))
             PE(pos, 2i+1) = cos(pos / (10000 ** (2i / d_model)))
 
-        These encode absolute position information into each dimension of
-        the input embeddings using sinusoids of varying wavelengths.
+        This injects fixed positional information into each embedding without training. These sinusoidal patterns allow the model to learn relative positions like:
+            - "because" comes after "jazz"
+            - "smoother" is at the end
+
+        It affects Q, K, and V equally — because they're computed from the input embeddings.
+
+        PositionalEncodingLayer gives each token an identity in space.
 
         Parameters
         ----------
@@ -25,7 +42,7 @@ class PositionalEncodingLayer(Module):
             The index of the embedding dimension. Must satisfy 0 <= i < d_model.
         """
 
-    def __init__(self, d_model: int, seq_len: int, dropout: float = 0.1):
+    def __init__(self, d_model: int, seq_len: int, p_drop: float = 0.1):
         super(PositionalEncodingLayer, self).__init__()
         # create a tensor of shape (seq_len, d_model)
         # position in the sequence (e.g. token index 0, 1, 2...)
@@ -57,7 +74,7 @@ class PositionalEncodingLayer(Module):
 
         # constant Tensor (no gradients)
         self.pe = Tensor(pe, requires_grad=False).unsqueeze(0)  # (1, seq_len, d_model)
-        self.dropout = Dropout(dropout)
+        self.dropout = Dropout(p_drop)
 
     def forward(self, x: Tensor):
         """
@@ -66,7 +83,8 @@ class PositionalEncodingLayer(Module):
          :param x: Tensor of shape [batch_size, max_seq_len, d_model]
          :return: Positional encodings of shape [max_seq_len, d_model]
          """
-        pe_sentence = Tensor(self.pe.data[:, x.shape()[1], :])
+        # slice correct amount of positional encodings
+        pe_sentence = Tensor(self.pe.data[:, :x.shape()[1], :])
         # don't learn this positional encoding -> it is fixed
         pe_sentence.requires_grad = False
         x = x + pe_sentence

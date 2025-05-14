@@ -3,24 +3,24 @@ from src.tensor import Tensor
 from src.transformer.layer.norm import NormLayer
 
 
-class ResidualConnectionBlock(Module):
+class ResidualConnectionLayer(Module):
     """
     Implements a residual connection around a given sublayer.
     This is a core building block used in Transformer architectures.
 
     Specifically:
-    - Applies Layer Normalization before the sublayer ("Pre-Norm" structure).
+    - Applies Layer Normalisation before the sublayer ("Pre-Norm" structure).
     - Applies a Dropout after the sublayer.
     - Adds the original input to the processed output (residual connection).
 
     Args:
         features (int): Number of feature dimensions in the input tensor.
-        dropout (float): Dropout rate applied after the sublayer output.
+        p_drop (float): Dropout rate applied after the sublayer output.
     """
-    def __init__(self, features: int, dropout: float):
-        super(ResidualConnectionBlock, self).__init__()
+    def __init__(self, features: int, p_drop: float):
+        super(ResidualConnectionLayer, self).__init__()
         self.norm_layer = NormLayer(features)
-        self.dropout = Dropout(dropout)
+        self.dropout = Dropout(p_drop)
 
     def forward(self, input: Tensor, sublayer: Module) -> Tensor:
         """

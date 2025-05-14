@@ -15,14 +15,14 @@ class PositionWiseFeedForwardLayer(Module):
     Args:
         d_model (int): Input and output dimensionality of the model.
         dff (int): Hidden layer size in the feedforward network.
-        dropout (float): Dropout probability (default: 0.1).
+        p_drop (float): Dropout probability (default: 0.1).
     """
-    def __init__(self, d_model, dff, dropout: float):
+    def __init__(self, d_model, dff, p_drop: float = 0.1):
         super(PositionWiseFeedForwardLayer, self).__init__()
         self.linear_w1 = Linear(d_model, dff)
         self.relu = ReLU()
         self.linear_w2 = Linear(dff, d_model)
-        self.dropout = Dropout(dropout)
+        self.dropout = Dropout(p_drop)
 
     def forward(self, input: Tensor) -> Tensor:
         """
