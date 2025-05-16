@@ -29,7 +29,7 @@ class PositionWiseFeedForwardLayer(Module):
         Forward pass through the position-wise feedforward block.
 
         Args:
-            residual (Tensor): Input tensor of shape (batch, seq_len, d_model)
+            input (Tensor): Input tensor of shape (batch, seq_len, d_model)
 
         Returns:
             Tensor: Output tensor of the same shape as input.

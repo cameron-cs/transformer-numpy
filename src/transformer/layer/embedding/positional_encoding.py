@@ -9,7 +9,11 @@ class PositionalEncodingLayer(Module):
         Compute the positional encoding for a given position and dimension index
         using the sinusoidal encoding scheme from the Transformer architecture.
 
-        Adds position-specific bias vectors to token embeddings
+        Positional encoding represents a pattern that can be learned by the model
+
+        Adds position-specific bias vectors to token embeddings.
+
+        The sentence "I love jazz because it is smoother" was converted into embeddings by the InputEmbeddingLayer
 
         Token:        I        love       jazz     because     it       is      smoother
         Position:     0          1          2         3         4        5         6

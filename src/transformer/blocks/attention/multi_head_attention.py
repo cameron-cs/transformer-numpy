@@ -27,17 +27,17 @@ class MultiHeadAttentionBlock(Module):
 
                                                                                                    d_model
                                                                                              (d_k)  (d_k)  (d_k)
-                      . . . . [ Q ]          @     [ Wq ]        =     [  Q' ] . . . . . .   [Q1]    [Q2]   [Q3]
+                      . . . .  [ Q ]          @     [ Wq ]        =     [  Q' ] . . . . . .  [Q1]    [Q2]   [Q3]
                       .    (seq, d_model)       (seq, d_model)      (seq, d_model)            .       .      .
                       .                                                                       .       .      .
                       .                                                                       .       .      .
                       .                                                                       .       .      .
-    [ Input ] . . . . . . . . [ K ]          @     [ Wk ]        =     [  K' ] . . . . . .   [K1]    [K2]   [K3]
+    [ Input ] . . . . . . . .  [ K ]          @     [ Wk ]        =     [  K' ] . . . . . .  [K1]    [K2]   [K3]
  (seq, d_model)       .    (seq, d_model)       (seq, d_model)      (seq, d_model)            .       .      .
                       .                                                                       .       .      .
                       .                                                                       .       .      .
                       .                                                                       .       .      .
-                      . . . . [ V ]          @     [ Wv ]        =     [  V' ] . . . . . .   [V1]    [V2]   [V3]
+                      . . . .  [ V ]          @     [ Wv ]        =     [  V' ] . . . . . .  [V1]    [V2]   [V3]
                            (seq, d_model)       (seq, d_model)      (seq, d_model)            .       .      .
                                                                                               .       .      .
                             Attention(Q, K, V) = softmax(Q @ Kᵀ/ sqrt(d_k) * V                .       .      .

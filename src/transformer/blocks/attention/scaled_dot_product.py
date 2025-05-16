@@ -65,7 +65,7 @@ class ScaledDotProductAttentionBlock(Module):
     Query2 ("love") flows through the attention mechanism as follows:
 
         - it is compared against all Keys → producing similarity scores
-        - these scores are normalized via softmax → giving attention weights w₁ to w₇
+        - these scores are normalised via softmax → giving attention weights w₁ to w₇
         - each weight wⱼ indicates how much "love" attends to word j
         - these are used to compute:
             Output("love") = w₁ · Value1 + w₂ · Value2 + ... + w₇ · Value7
