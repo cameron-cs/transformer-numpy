@@ -11,6 +11,32 @@ class NormLayer(Module):
       (typically the embedding or feature dimension), followed by learnable
       affine transformation using `gamma` and `beta`.
 
+      Example (after InputEmbeddingLayer + PositionalEncodingLayer):
+
+        Sentence:        "I love jazz because it is smoother"
+        Token Embeddings (dim=4):  [shown below before normalisation]
+
+        Raw Input:
+        ┌────────────┬────────────┬────────────┬────────────┐
+        │   0.10     │   0.30     │  -0.20     │   0.50     │ ← "I"
+        │   0.25     │  -0.10     │   0.40     │   0.05     │ ← "love"
+        │  -0.30     │   0.60     │   0.20     │   0.10     │ ← "jazz"
+        └────────────┴────────────┴────────────┴────────────┘
+
+        Step-by-step per token (last dim is normalized):
+
+        Token: "I"
+        μ = mean([0.1, 0.3, -0.2, 0.5])   = 0.175
+        σ² = var([...])                   ≈ 0.0675
+        std = sqrt(σ² + eps)              ≈ 0.260
+
+        Normalised:
+        [(0.1 - 0.175) / 0.260, (0.3 - 0.175) / 0.260, ...]
+        ≈ [-0.29, 0.48, -1.44, 1.25]
+
+        Output after γ and β (default: γ=1, β=0):
+        ≈ [-0.29, 0.48, -1.44, 1.25]
+
       This layer normalises each sample independently rather than across the batch,
       making it suitable for transformers and non-CNN models.
 
