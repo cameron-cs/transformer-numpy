@@ -23,7 +23,7 @@ class NormLayer(Module):
         │  -0.30     │   0.60     │   0.20     │   0.10     │ ← "jazz"
         └────────────┴────────────┴────────────┴────────────┘
 
-        Step-by-step per token (last dim is normalized):
+        Step-by-step per token (last dim is normalised):
 
         Token: "I"
         μ = mean([0.1, 0.3, -0.2, 0.5])   = 0.175
