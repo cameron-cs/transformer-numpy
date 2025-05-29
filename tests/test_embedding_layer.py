@@ -1,5 +1,8 @@
+import math
+
 import numpy as np
 
+from src.transformer.layer.embedding.input import InputEmbeddingLayer
 from src.transformer.layer.embedding.positional_encoding import PositionalEncodingLayer
 from src.tensor import Tensor
 
@@ -55,14 +58,50 @@ def test_dropout_preserves_shape_on_sentence():
     assert out.shape() == (batch_size, seq_len, d_model), "Dropout should not change shape"
 
 
-def test_positional_encoding_visualization():
-    pe = PositionalEncodingLayer(d_model=d_model, seq_len=seq_len, p_drop=0.0)
+def test_input_embedding_shape_and_scale():
+    vocab_size = 10
+    d_model = 4
+    batch_size = 2
+    seq_len = 3
 
-    # (1, seq_len, d_model) → (seq_len, d_model)
-    pe_matrix = pe.pe.data.squeeze()
+    # token indices
+    input_ids = Tensor(np.array([[1, 2, 3], [4, 5, 6]]), requires_grad=False)
 
-    assert np.isclose(pe_matrix[1, 0], 0.8415, atol=1e-4)
-    assert np.isclose(pe_matrix[2, 1], -0.4161, atol=1e-4)
+    # init embedding layer
+    layer = InputEmbeddingLayer(d_model=d_model, vocab_size=vocab_size)
+
+    # known weights for deterministic test
+    layer.embedding.weight.data[:] = np.arange(vocab_size * d_model).reshape(vocab_size, d_model)
+
+    # forward pass
+    output = layer.forward(input_ids)
+
+    # shape
+    assert output.shape() == (batch_size, seq_len, d_model), \
+        f"Expected output shape {(batch_size, seq_len, d_model)}, got {output.shape()}"
+
+    expected_scale = math.sqrt(d_model)
+    raw_vector = layer.embedding.weight.data[1]
+    scaled_vector = output.data[0, 0]
+    assert np.allclose(scaled_vector, raw_vector * expected_scale), \
+        f"Expected scaled vector {raw_vector * expected_scale}, got {scaled_vector}"
+
+
+def test_input_embedding_reproducibility():
+    vocab_size = 20
+    d_model = 8
+
+    input_ids = Tensor(np.array([[5, 5, 5]]), requires_grad=False)
+    layer = InputEmbeddingLayer(d_model=d_model, vocab_size=vocab_size)
+
+    out = layer(input_ids)
+
+    first = out.data[0, 0]
+    second = out.data[0, 1]
+    third = out.data[0, 2]
+
+    assert np.allclose(first, second), "Embeddings for same token index must match"
+    assert np.allclose(second, third), "Embeddings for same token index must match"
 
 
 if __name__ == '__main__':
@@ -72,4 +111,5 @@ if __name__ == '__main__':
     test_pe_determinism_on_sentence()
     test_pe_sin_cos_structure_on_sentence()
     test_dropout_preserves_shape_on_sentence()
-    test_positional_encoding_visualization()
+    test_input_embedding_shape_and_scale()
+    test_input_embedding_reproducibility()

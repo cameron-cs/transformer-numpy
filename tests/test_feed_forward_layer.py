@@ -7,7 +7,7 @@ from src.transformer.layer.feed_forward.position_wise_feed_forward import Positi
 
 def test_positionwise_ff_output_shape_and_type():
     x = Tensor(np.random.randn(2, 5, 16), requires_grad=True)  # (batch, seq_len, d_model)
-    ff = PositionWiseFeedForwardLayer(d_model=16, d_hidden=32)
+    ff = PositionWiseFeedForwardLayer(d_model=16, dff=32)
     out = ff(x)
     assert isinstance(out, Tensor)
     assert out.shape() == x.shape()
@@ -15,7 +15,7 @@ def test_positionwise_ff_output_shape_and_type():
 
 def test_positionwise_ff_backward_pass():
     x = Tensor(np.random.randn(1, 3, 8), requires_grad=True)
-    ff = PositionWiseFeedForwardLayer(d_model=8, d_hidden=16)
+    ff = PositionWiseFeedForwardLayer(d_model=8, dff=16)
     out = ff(x)
     loss = out.sum()
     loss.backward()
@@ -25,7 +25,7 @@ def test_positionwise_ff_backward_pass():
 
 def test_positionwise_ff_numerical_gradient():
     x = Tensor(np.random.randn(1, 2, 4), requires_grad=True)
-    ff = PositionWiseFeedForwardLayer(d_model=4, d_hidden=8, d_prob=0.0)
+    ff = PositionWiseFeedForwardLayer(d_model=4, dff=8, p_drop=0.0)
 
     out = ff(x)
     out.sum().backward()
@@ -48,7 +48,6 @@ def test_positionwise_ff_numerical_gradient():
 
     diff = np.abs(numerical_grad - analytical_grad)
     max_diff = diff.max()
-    print(f"Max diff: {max_diff}")
     assert max_diff < 1e-2, f"Gradient check failed: {max_diff}"
 
 

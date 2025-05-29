@@ -1,6 +1,6 @@
-from src.nn import Module, Linear, Dropout
+from src.nn import Module, Linear
 from src.tensor import Tensor
-from src.transformer.blocks.attention.scaled_dot_product import ScaledDotProductAttentionBlock
+from src.transformer.layer.attention.scaled_dot_product import ScaledDotProductAttentionBlock
 
 
 class MultiHeadAttentionBlock(Module):

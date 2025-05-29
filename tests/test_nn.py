@@ -1,8 +1,8 @@
 import numpy as np
 
-from src.nn import Dropout
+from src.nn import Dropout, Embedding, ModuleList, Linear
 from src.tensor import Tensor
-from src.transformer.layer.norm.norm import LayerNorm
+from src.transformer.layer.norm import NormLayer
 
 
 def test_dropout_backward():
@@ -30,14 +30,14 @@ def test_dropout_training_mode():
 
 def test_layernorm_forward_shape():
     x = Tensor(np.random.randn(4, 10), requires_grad=True)
-    norm = LayerNorm(d_model=10, eps=1e-5)
+    norm = NormLayer(d_model=10, eps=1e-5)
     out = norm(x)
     assert out.data.shape == x.data.shape, "Output shape must match input shape"
 
 
 def test_layernorm_forward_mean_std():
     x = Tensor(np.random.randn(2, 4), requires_grad=True)
-    norm = LayerNorm(d_model=4, eps=1e-5)
+    norm = NormLayer(d_model=4, eps=1e-5)
     out = norm(x)
 
     # remove scale/shift to test normalised values
@@ -53,7 +53,7 @@ def test_layernorm_forward_mean_std():
 
 def test_layernorm_backward_passes():
     x = Tensor(np.random.randn(3, 5), requires_grad=True)
-    norm = LayerNorm(d_model=5, eps=1e-5)
+    norm = NormLayer(d_model=5, eps=1e-5)
     out = norm(x)
     out.sum().backward()
 
@@ -62,9 +62,40 @@ def test_layernorm_backward_passes():
     assert norm.beta.grad is not None, "Gradients must flow to beta"
 
 
+def test_module_list_basic_forward_manual():
+    x = Tensor(np.random.randn(2, 10), requires_grad=True)
+
+    layers = ModuleList([
+        Linear(10, 20),
+        Linear(20, 30),
+        Linear(30, 40),
+    ])
+
+    out = x
+    for layer in layers:
+        out = layer(out)
+
+    assert out.shape() == (2, 40), f"Expected output shape (2, 40), got {out.shape()}"
+
+
+def test_module_list_parameters_aggregation():
+    ml = ModuleList([
+        Linear(4, 8),
+        Linear(8, 16)
+    ])
+
+    params = ml.parameters()
+
+    assert len(params) == 4, f"Expected 4 parameters total, got {len(params)}"
+    assert all(isinstance(p, Tensor) for p in params)
+    assert all(p.requires_grad for p in params)
+
+
 if __name__ == '__main__':
     test_dropout_training_mode()
     test_dropout_backward()
     test_layernorm_forward_shape()
     test_layernorm_forward_mean_std()
     test_layernorm_backward_passes()
+    test_module_list_basic_forward_manual()
+    test_module_list_parameters_aggregation()

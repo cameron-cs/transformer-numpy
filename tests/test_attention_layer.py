@@ -3,9 +3,11 @@ import math
 import numpy as np
 
 from src import nn
+from src.nn import Embedding
 from src.tensor import Tensor
-from src.transformer.blocks.attention.multi_head_attention import MultiHeadAttentionBlock
-from src.transformer.blocks.attention.scaled_dot_product import ScaledDotProductAttentionBlock
+from src.transformer.layer.attention.multi_head_attention import MultiHeadAttentionBlock
+from src.transformer.layer.attention.scaled_dot_product import ScaledDotProductAttentionBlock
+from src.transformer.layer.embedding.positional_encoding import PositionalEncodingLayer
 
 
 def test_scaled_dot_product_attention():
