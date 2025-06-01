@@ -5,17 +5,31 @@ from src.transformer.layer.norm import NormLayer
 
 class ResidualConnectionLayer(Module):
     """
-    Implements a residual connection around a given sublayer.
-    This is a core building block used in Transformer architectures.
+   Applies residual connections with layer normalisation and dropout.
 
-    Specifically:
-    - Applies Layer Normalisation before the sublayer ("Pre-Norm" structure).
-    - Applies a Dropout after the sublayer.
-    - Adds the original input to the processed output (residual connection).
+    This block wraps any sublayer (e.g., attention or feedforward), standardises the input,
+    adds dropout regularisation, and sums the original input to the result.
+
+       Pre-norm design:
+        Normalise before sublayer for better gradient flow and stable training.
+
+       Example (token: "jazz"):
+        Let's say the self-attention or feedforward output vector for "jazz" is:
+            sublayer(x) = [0.9, -1.1, 0.3, 0.5]
+        The normalised input x was:
+            norm(x)     = [0.5, -0.5, 0.0, 0.0]
+        After dropout, we get:
+            dropped     = [0.9,  0.0, 0.3, 0.5]   # some dims dropped
+        Residual output:
+            out         = input + dropped
+                        = [0.5, -0.5, 0.0, 0.0] + [0.9, 0.0, 0.3, 0.5]
+                        = [1.4, -0.5, 0.3, 0.5]
+
+    This helps preserve input information and gradients over many layers.
 
     Args:
-        features (int): Number of feature dimensions in the input tensor.
-        p_drop (float): Dropout rate applied after the sublayer output.
+        features (int): Feature dimension, e.g., 512
+        p_drop (float): Dropout rate (e.g., 0.1)
     """
     def __init__(self, features: int, p_drop: float):
         super(ResidualConnectionLayer, self).__init__()
@@ -40,7 +54,7 @@ class ResidualConnectionLayer(Module):
             4. Add the original input to the dropped output (residual connection).
         """
         x: Tensor = self.norm_layer(input)
-        x: Tensor = sublayer.forward(x)
+        x: Tensor = sublayer(x)
         x: Tensor = x + self.dropout(x)
         return x
 

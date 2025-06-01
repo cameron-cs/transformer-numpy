@@ -4,20 +4,29 @@ from src.nn import Module, Linear, Dropout, ReLU
 
 class PositionWiseFeedForwardLayer(Module):
     """
-    Implements the position-wise feedforward sublayer used in Transformer models.
+    Applies residual connections with layer normalisation and dropout.
 
-    This layer consists of:
-    - NormLayer for input normalisation
-    - A two-layer MLP with a ReLU activation in between
-    - Dropout after the second linear layer
-    - A residual connection is added to the output
+    This block wraps any sublayer (e.g., attention or feedforward), standardises the input,
+    adds dropout regularisation, and sums the original input to the result.
 
-    Args:
-        d_model (int): Input and output dimensionality of the model.
-        dff (int): Hidden layer size in the feedforward network.
-        p_drop (float): Dropout probability (default: 0.1).
+       Pre-norm design:
+        Normalise before sublayer for better gradient flow and stable training.
+
+       Example (token: "jazz"):
+        Let's say the self-attention or feedforward output vector for "jazz" is:
+            sublayer(x) = [0.9, -1.1, 0.3, 0.5]
+        The normalised input x was:
+            norm(x)     = [0.5, -0.5, 0.0, 0.0]
+        After dropout, we get:
+            dropped     = [0.9,  0.0, 0.3, 0.5]   # some dims dropped
+        Residual output:
+            out         = input + dropped
+                        = [0.5, -0.5, 0.0, 0.0] + [0.9, 0.0, 0.3, 0.5]
+                        = [1.4, -0.5, 0.3, 0.5]
+
+    This helps preserve input information and gradients over many layers.
     """
-    def __init__(self, d_model, dff, p_drop: float = 0.1):
+    def __init__(self, d_model: int, dff: int, p_drop: float = 0.1):
         super(PositionWiseFeedForwardLayer, self).__init__()
         self.linear_w1 = Linear(d_model, dff)
         self.relu = ReLU()
