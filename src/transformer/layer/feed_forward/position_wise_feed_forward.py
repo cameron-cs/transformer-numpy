@@ -4,27 +4,64 @@ from src.nn import Module, Linear, Dropout, ReLU
 
 class PositionWiseFeedForwardLayer(Module):
     """
-    Applies residual connections with layer normalisation and dropout.
+    Each position (i.e., each token vector) in the sequence is passed independently through the same two-layer
+    fully connected network. This layer is shared across time and does not mix information between tokens.
 
-    This block wraps any sublayer (e.g., attention or feedforward), standardises the input,
-    adds dropout regularisation, and sums the original input to the result.
+    Mathematically:
+        FF(x) = max(0, xW₁ + b₁)W₂ + b₂
 
-       Pre-norm design:
-        Normalise before sublayer for better gradient flow and stable training.
+    Where:
+        - x: input tensor of shape (B, L, d_model)
+        - W₁: first weight matrix of shape (d_model, d_ff)
+        - b₁: first bias vector of shape (d_ff,)
+        - W₂: second weight matrix of shape (d_ff, d_model)
+        - b₂: second bias vector of shape (d_model,)
 
-       Example (token: "jazz"):
-        Let's say the self-attention or feedforward output vector for "jazz" is:
-            sublayer(x) = [0.9, -1.1, 0.3, 0.5]
-        The normalised input x was:
-            norm(x)     = [0.5, -0.5, 0.0, 0.0]
-        After dropout, we get:
-            dropped     = [0.9,  0.0, 0.3, 0.5]   # some dims dropped
-        Residual output:
-            out         = input + dropped
-                        = [0.5, -0.5, 0.0, 0.0] + [0.9, 0.0, 0.3, 0.5]
-                        = [1.4, -0.5, 0.3, 0.5]
+    ---------------------------------------------------------------------------------------------------------
+    Purpose:
+        - Increases model capacity by allowing non-linear transformations of each token embedding.
+        - Introduces depth and flexibility into each layer of the encoder/decoder.
+        - Unlike convolutions or attention, it does not share computation across positions.
 
-    This helps preserve input information and gradients over many layers.
+    ---------------------------------------------------------------------------------------------------------
+    Example:
+
+        Sentence: ["I", "love", "jazz", "because", "it", "is", "smoother"]
+
+        Suppose each token is represented as a 512-dim vector (d_model = 512)
+
+        The FFN applies:
+            - A linear transformation to 2048-dim (d_ff = 2048)
+            - ReLU activation
+            - Dropout
+            - Then projects back to 512-dim
+
+        Each token vector is transformed independently:
+            x_i → Linear(512 → 2048) → ReLU → Dropout → Linear(2048 → 512)
+
+    ---------------------------------------------------------------------------------------------------------
+    Visualisation (token: "jazz"):
+
+           [ Input ]
+               ↓
+        ┌───────────────┐       ┌───────────────┐       ┌───────────────┐
+        │ Linear (W₁)   │──────▶│   ReLU        │──────▶│ Linear (W₂)   │
+        │ (512 → 2048)  │       │ element-wise  │       │ (2048 → 512)  │
+        └───────────────┘       └───────────────┘       └───────────────┘
+                                                               ↓
+                                                           [ Output ]
+
+        Output is same shape as input: (B, L, d_model)
+        Transformation happens for each position separately → token-wise nonlinearity
+
+    ---------------------------------------------------------------------------------------------------------
+    Args:
+        d_model (int): Dimensionality of the model (input and output size of the FFN)
+        dff (int): Inner layer dimensionality (usually 2–4x d_model)
+        p_drop (float): Dropout probability after activation (default: 0.1)
+
+    Returns:
+        Tensor: Output tensor of same shape as input, transformed position-wise
     """
     def __init__(self, d_model: int, dff: int, p_drop: float = 0.1):
         super(PositionWiseFeedForwardLayer, self).__init__()
